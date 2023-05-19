@@ -63,6 +63,28 @@ namespace YskConsole.Database.Repository
             return await MongodbCollection.Find(x => x.Id == ıd).SingleOrDefaultAsync();
         }
 
+        public async Task UpdateBulkTc(List<OyveItesiOylar> models)
+        {
+
+            foreach (var item in models.Partition(1000))
+            {
+
+                var listWrites = new List<WriteModel<OyveItesiOylar>>();
+
+                foreach (var model in item)
+                {
+                    var filter = Builders<OyveItesiOylar>.Filter.Eq(x => x.Id, model.Id);
+                    var update = Builders<OyveItesiOylar>.Update
+                        .Set(x => x.TcKimlikNo, model.TcKimlikNo);
+
+                    listWrites.Add(new UpdateManyModel<OyveItesiOylar>(filter, update));
+                }
+
+
+                await MongodbCollection.BulkWriteAsync(listWrites);
+            }
+
+        }
         public async Task UpdateBulkCityDistrict(List<OyveItesiOylar> models)
         {
 

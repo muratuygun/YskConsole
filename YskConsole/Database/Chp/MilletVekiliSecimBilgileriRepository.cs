@@ -15,6 +15,10 @@ namespace YskConsole.Database
         private readonly IMongoCollection<MilletVekiliSecimBilgileri> MongodbCollection;
 
 
+        public async Task<MilletVekiliSecimBilgileri> GetFirstIlIlceSandik(string il, string ilce, string sandikno)
+        {
+            return await MongodbCollection.Find(x => x.Il == il && x.Ilce == ilce && x.SandikNo == sandikno).FirstOrDefaultAsync();
+        }
         public async Task<List<MilletVekiliSecimBilgileri>> GetAllIlIlceSandik(string il, string ilce, string sandikno)
         {
             return await MongodbCollection.Find(x => x.Il == il && x.Ilce == ilce && x.SandikNo == sandikno).ToListAsync();

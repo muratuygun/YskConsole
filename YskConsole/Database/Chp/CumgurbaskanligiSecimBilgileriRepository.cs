@@ -14,6 +14,10 @@ namespace YskConsole.Database.Repository
         public MongodbConnector mongoDbConnector { get; }
         private readonly IMongoCollection<CumgurbaskanligiSecimBilgileri> MongodbCollection;
 
+        public async Task<CumgurbaskanligiSecimBilgileri> GetFirstIlIlceSandik(string il, string ilce, string sandikno)
+        {
+            return await MongodbCollection.Find(x => x.Il == il && x.Ilce == ilce && x.SandikNo == sandikno).FirstOrDefaultAsync();
+        }
 
         public async Task<List<CumgurbaskanligiSecimBilgileri>> GetAllIlIlceSandik(string il,string ilce,string sandikno)
         {

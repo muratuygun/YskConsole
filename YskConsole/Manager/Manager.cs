@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -7,6 +8,8 @@ using System.Text;
 using System.Threading.Tasks;
 using YskConsole.Database;
 using YskConsole.Database.Repository;
+using YskConsole.Models;
+using YskConsole.Utility;
 
 namespace YskConsole.Manager
 {
@@ -16,15 +19,127 @@ namespace YskConsole.Manager
         MilletVekiliSecimBilgileriRepository milletVekiliSecimBilgileriRepository;
         CumgurbaskanligiSecimBilgileriRepository cumgurbaskanligiSecimBilgileriRepository;
         StsChpOrgCrawler stsChpOrgCrawler;
+        OyveItesiOylarRepository oyveItesiOylarRepository;
+        sqlRepository sqlRepository;
         public Manager()
         {
             locationUrlCrawlerRepository = new LocationUrlCrawlerRepository();
             milletVekiliSecimBilgileriRepository = new MilletVekiliSecimBilgileriRepository();
             cumgurbaskanligiSecimBilgileriRepository = new CumgurbaskanligiSecimBilgileriRepository();
             stsChpOrgCrawler = new StsChpOrgCrawler();
+            oyveItesiOylarRepository = new OyveItesiOylarRepository();
+
+            sqlRepository = new sqlRepository();
+        }
+
+        public async Task GetAllCurrentDatas()
+        {
+
+            var oyveotesidatas = await oyveItesiOylarRepository.GetAll();
+
+
+            var datas = new List<ResultCompareModel>();
+
+            foreach (var items in oyveotesidatas.Partition(100))
+            {
+                var lstResults = new ConcurrentBag<StsChpOrgGetModel>();
+                foreach (var item in items)
+                {
+                    var datasysk = await cumgurbaskanligiSecimBilgileriRepository.GetFirstIlIlceSandik(item.CityName, item.DistrictName, item.ballot_box_number.ToString());
+                    var dataMvsysk = await milletVekiliSecimBilgileriRepository.GetFirstIlIlceSandik(item.CityName, item.DistrictName, item.ballot_box_number.ToString());
+
+                    if (datasysk == null)
+                    {
+                        continue;
+                    }
+                    var mastersw = Stopwatch.StartNew();
+
+                    var result = await stsChpOrgCrawler.Get(datasysk.TcKimlikNo);
+                    lstResults.Add(result);
+
+                    if(result.milletVekiliSecimBilgileri.txtMhp != dataMvsysk.txtMhp ||
+                        result.milletVekiliSecimBilgileri.txtCHP != dataMvsysk.txtCHP ||
+                        result.milletVekiliSecimBilgileri.txtIyi != dataMvsysk.txtIyi ||
+                        result.milletVekiliSecimBilgileri.txtAkp != dataMvsysk.txtAkp ||
+                        result.milletVekiliSecimBilgileri.txtYesilSol != dataMvsysk.txtYesilSol )
+                    {
+                        Console.WriteLine("değişmiş 1 ");
+                    }
+
+
+                    if (result.cumgurbaskanligiSecimBilgileri.txtCB1 != datasysk.txtCB1 ||
+                        result.cumgurbaskanligiSecimBilgileri.txtCB2 != datasysk.txtCB2 ||
+                        result.cumgurbaskanligiSecimBilgileri.txtCB3 != datasysk.txtCB3 ||
+                        result.cumgurbaskanligiSecimBilgileri.txtCB4 != datasysk.txtCB4)
+                    {
+                        Console.WriteLine("değişmiş  2");
+                    }
+
+                    mastersw.Stop();
+
+                }
+
+                await SaveDatas(lstResults);
+
+
+            }
 
         }
 
+        public string TurkishCharacterToEnglish(string text)
+        {
+            char[] turkishChars = { 'ı', 'ğ', 'İ', 'Ğ', 'ç', 'Ç', 'ş', 'Ş', 'ö', 'Ö', 'ü', 'Ü' };
+            char[] englishChars = { 'i', 'g', 'I', 'G', 'c', 'C', 's', 'S', 'o', 'O', 'u', 'U' };
+
+            // Match chars
+            for (int i = 0; i < turkishChars.Length; i++)
+                text = text.Replace(turkishChars[i], englishChars[i]);
+
+            return text;
+        }
+        public async Task GetAllFindBallotBox()
+        {
+            var oyveotesidatas = await oyveItesiOylarRepository.GetAll();
+
+            oyveotesidatas = oyveotesidatas.Where(x => x.TcKimlikNo == null).OrderBy(x=> x.CityName).ThenBy(x=>x.DistrictName).ToList();
+
+            await Parallel.ForEachAsync(oyveotesidatas, new ParallelOptions() { MaxDegreeOfParallelism = 50 }, async (item, c) =>
+            {
+
+                Console.WriteLine($"{oyveotesidatas.Count} {oyveotesidatas.IndexOf(item)}  {item.CityName} {item.DistrictName} {item.NeighborhoodName} {item.ballot_box_number}");
+                var datas = await sqlRepository.Get(TurkishCharacterToEnglish(item.CityName), TurkishCharacterToEnglish(item.DistrictName), TurkishCharacterToEnglish(item.NeighborhoodName), TurkishCharacterToEnglish(item.NeighborhoodName).Replace("MAH.", "KOYU"));
+                var tcList = datas.Select(x => x.Field_1.ToString());
+                if (tcList.Count() > 20)
+                {
+                    tcList = tcList.Take(20);
+                }
+
+                var lstResults = new ConcurrentBag<StsChpOrgGetModel>();
+                await Parallel.ForEachAsync(tcList, new ParallelOptions() { MaxDegreeOfParallelism = 20 }, async (item, c) =>
+                {
+
+                    var result = await stsChpOrgCrawler.Get(item);
+                    lstResults.Add(result);
+
+                });
+                await SaveDatas(lstResults);
+
+                foreach (var res in lstResults)
+                {
+                    if (res.milletVekiliSecimBilgileri != null && item.ballot_box_number.ToString() == res.milletVekiliSecimBilgileri.SandikNo)
+                    {
+
+                        Console.WriteLine($"{oyveotesidatas.Count} {oyveotesidatas.IndexOf(item)}  {item.CityName} {item.DistrictName} {item.NeighborhoodName} {item.ballot_box_number} bulundu");  
+                        item.TcKimlikNo = res.milletVekiliSecimBilgileri.TcKimlikNo;
+                        await oyveItesiOylarRepository.UpdateBulkTc(new List<OyveItesiOylar>() { item });
+                        break;
+                    }
+                }
+            });
+
+
+
+        }
         public async Task GetAll()
         {
             var openfile = File.OpenText("D:\\data\\data_dump-002.sql");

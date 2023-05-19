@@ -17,12 +17,47 @@ namespace YskConsole.DataProgress
             oyveOtesiNeighborhoodsRepository = new OyveOtesiNeighborhoodsRepository();
             oyveOtesiDistrictsRepository = new OyveOtesiDistrictsRepository();
             OyveOtesiCities = new OyveOtesiCitiesRepository();
+
+            cumgurbaskanligiSecimBilgileriRepository = new CumgurbaskanligiSecimBilgileriRepository();
+            milletVekiliSecimBilgileriRepository = new MilletVekiliSecimBilgileriRepository();
         }
 
+        MilletVekiliSecimBilgileriRepository milletVekiliSecimBilgileriRepository;
+        CumgurbaskanligiSecimBilgileriRepository cumgurbaskanligiSecimBilgileriRepository;
         OyveItesiOylarRepository oyveItesiOylarRepository;
         OyveOtesiNeighborhoodsRepository oyveOtesiNeighborhoodsRepository;
         OyveOtesiDistrictsRepository oyveOtesiDistrictsRepository;
         OyveOtesiCitiesRepository OyveOtesiCities;
+
+
+        public async Task OyveOtesiTcUpdate()
+        {
+            var datas = await oyveItesiOylarRepository.GetAll();
+            foreach (var item in datas)
+            {                
+                var dataMvsysk = await milletVekiliSecimBilgileriRepository.GetAllIlIlceSandik(item.CityName, item.DistrictName.Replace(item.CityName, "").Trim(), item.ballot_box_number.ToString());
+
+                if (dataMvsysk != null && dataMvsysk.Count > 0)
+                {
+                    item.TcKimlikNo = dataMvsysk[0].TcKimlikNo;
+
+                }else
+                {
+                    var datasysk = await cumgurbaskanligiSecimBilgileriRepository.GetAllIlIlceSandik(item.CityName, item.DistrictName.Replace(item.CityName, "").Trim(), item.ballot_box_number.ToString());
+                    if (datasysk != null && datasysk.Count > 0)
+                    {
+                        item.TcKimlikNo = datasysk[0].TcKimlikNo;
+                    }
+                    else
+                    {
+                        Console.WriteLine($"{item.CityName} {item.DistrictName} {item.ballot_box_number.ToString()}");
+                    }
+                }
+                
+            }
+
+            await oyveItesiOylarRepository.UpdateBulkTc(datas);
+        }
 
         public async Task OyveOtesiIlIlceNameUpdate()
         {

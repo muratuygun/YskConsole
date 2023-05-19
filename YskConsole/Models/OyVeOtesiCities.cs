@@ -34,6 +34,7 @@ namespace YskConsole.Models
     }
     public class OyveItesiOylar : MongoDbIdModel
     {
+        public string TcKimlikNo { get; set; }
         public int CityId { get; set; }
         public string CityName { get; set; }
 
