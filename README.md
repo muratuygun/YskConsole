@@ -2,6 +2,10 @@
 
 Seçim 2023 verilerini crawl etmek için oluşturulmuştur.
 
+
+CumhurBaskanligiRawData.csv (190.325 sandık)
+https://drive.google.com/file/d/1--JjX2TpnfxQ7_vykOMZmR32q0vbN-oj/view?usp=sharing
+
 karşılaştırma verileri burada
 https://drive.google.com/file/d/1yA-UNc5g_ap-wsp2tCCy_9_GAkSuGWqr/view?usp=sharing
 
